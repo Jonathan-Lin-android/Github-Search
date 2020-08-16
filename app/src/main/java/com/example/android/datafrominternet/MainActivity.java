@@ -32,6 +32,9 @@ import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
 
+    private final String SEARCH_QUERY_URL_EXTRA = "query";
+
+    private final String SEARCH_RESULTS_RAW_JSON = "results";
     EditText mSearchBoxEditText;
 
     TextView mUrlDisplayTextView;
@@ -39,7 +42,20 @@ public class MainActivity extends AppCompatActivity {
     TextView mSearchResultsTextView;
 
     TextView mErrorMessageDisplay;
+
     ProgressBar mLoadingIndicator;
+
+
+    @Override
+    protected void onSaveInstanceState(final Bundle outState) {
+        super.onSaveInstanceState(outState);
+        String queryUrl = mUrlDisplayTextView.getText().toString();
+        String rawJsonSearchResults = mSearchResultsTextView.getText().toString();
+
+        outState.putString(SEARCH_QUERY_URL_EXTRA, queryUrl);
+        outState.putString(SEARCH_RESULTS_RAW_JSON, rawJsonSearchResults);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,9 +66,15 @@ public class MainActivity extends AppCompatActivity {
         mSearchResultsTextView = (TextView) findViewById(R.id.tv_github_search_results_json);
         mErrorMessageDisplay = (TextView) findViewById(R.id.tv_error_message_display);
         mLoadingIndicator = (ProgressBar) findViewById(R.id.pb_loading_indicator);
+
+        if(savedInstanceState != null) {
+            mSearchBoxEditText.setText(savedInstanceState.getString(SEARCH_QUERY_URL_EXTRA));
+            mSearchResultsTextView.setText(savedInstanceState.getString(SEARCH_RESULTS_RAW_JSON));
+        }
     }
 
     public class GithubQueryTask extends AsyncTask<URL, Void, String> {
+
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
