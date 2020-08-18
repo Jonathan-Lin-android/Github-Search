@@ -119,14 +119,29 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public Loader<String> onCreateLoader(final int id, @Nullable final Bundle bundle) {
         return new AsyncTaskLoader<String>(this) {
+
+            String mGithubJson;
             //Asynctask onPreExecute
             @Override
             protected void onStartLoading() {
                 super.onStartLoading();
                 if(bundle == null)
                     return;
-                mLoadingIndicator.setVisibility(View.VISIBLE);
-                forceLoad();
+                if(mGithubJson != null)
+                    deliverResult(mGithubJson);
+                else {
+                    mLoadingIndicator.setVisibility(View.VISIBLE);
+                    forceLoad();
+                }
+            }
+
+            // used for when switching back and forth betweewn apps so there will be no reboots like configuration change from rotating device
+            // happens after loadInBackground.
+            // super.deliverResult(data) forces to skip loadInBackground
+            @Override
+            public void deliverResult(@Nullable final String data) {
+                mGithubJson = data;
+                super.deliverResult(data);
             }
 
             //Asynctask doInBackground
