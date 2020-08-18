@@ -18,7 +18,13 @@ package com.example.android.datafrominternet;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.AsyncTaskLoader;
+import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -30,11 +36,14 @@ import com.example.android.datafrominternet.utilities.NetworkUtils;
 import java.io.IOException;
 import java.net.URL;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<String> {
 
     private final String SEARCH_QUERY_URL_EXTRA = "query";
 
     private final String SEARCH_RESULTS_RAW_JSON = "results";
+
+    private final int GITHUB_SEARCH_LOADER = 22;
+
     EditText mSearchBoxEditText;
 
     TextView mUrlDisplayTextView;
@@ -53,7 +62,6 @@ public class MainActivity extends AppCompatActivity {
         String rawJsonSearchResults = mSearchResultsTextView.getText().toString();
 
         outState.putString(SEARCH_QUERY_URL_EXTRA, queryUrl);
-        outState.putString(SEARCH_RESULTS_RAW_JSON, rawJsonSearchResults);
     }
 
     @Override
@@ -67,12 +75,14 @@ public class MainActivity extends AppCompatActivity {
         mErrorMessageDisplay = (TextView) findViewById(R.id.tv_error_message_display);
         mLoadingIndicator = (ProgressBar) findViewById(R.id.pb_loading_indicator);
 
-        if(savedInstanceState != null) {
-            mSearchBoxEditText.setText(savedInstanceState.getString(SEARCH_QUERY_URL_EXTRA));
-            mSearchResultsTextView.setText(savedInstanceState.getString(SEARCH_RESULTS_RAW_JSON));
+        if (savedInstanceState != null) {
+            String queryUrl = savedInstanceState.getString(SEARCH_QUERY_URL_EXTRA);
+            mUrlDisplayTextView.setText(queryUrl);
+            getSupportLoaderManager().initLoader(GITHUB_SEARCH_LOADER, null, this);
         }
     }
 
+    /*
     public class GithubQueryTask extends AsyncTask<URL, Void, String> {
 
         @Override
@@ -103,6 +113,56 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+     */
+
+    @NonNull
+    @Override
+    public Loader<String> onCreateLoader(final int id, @Nullable final Bundle bundle) {
+        return new AsyncTaskLoader<String>(this) {
+            //Asynctask onPreExecute
+            @Override
+            protected void onStartLoading() {
+                super.onStartLoading();
+                if(bundle == null)
+                    return;
+                mLoadingIndicator.setVisibility(View.VISIBLE);
+                forceLoad();
+            }
+
+            //Asynctask doInBackground
+            @Nullable
+            @Override
+            public String loadInBackground() {
+                String searchQueryUrlString = bundle.getString(SEARCH_QUERY_URL_EXTRA);
+                if(searchQueryUrlString == null || TextUtils.isEmpty(searchQueryUrlString))
+                    return null;
+
+                try {
+                    return NetworkUtils.getResponseFromHttpUrl(new URL(searchQueryUrlString));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return null;
+                }
+            }
+        };
+    }
+
+    //Asynctask onPostExecute
+    @Override
+    public void onLoadFinished(@NonNull final Loader<String> loader, final String data) {
+        mLoadingIndicator.setVisibility(View.INVISIBLE);
+        if (data != null && !data.equals("")) {
+            showJsonDataView();
+            mSearchResultsTextView.setText(data);
+        } else {
+            showErrorMessage();
+        }
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull final Loader<String> loader) {
+
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -122,10 +182,29 @@ public class MainActivity extends AppCompatActivity {
 
     void makeGithubSearchQuery() {
         String githubQuery = mSearchBoxEditText.getText().toString();
+
+        if (TextUtils.isEmpty(githubQuery)) {
+            mUrlDisplayTextView.setText("No query entered, nothing to search for.");
+            return;
+        }
+
         URL githubSearchUrl = NetworkUtils.buildUrl(githubQuery);
         mUrlDisplayTextView.setText(githubSearchUrl.toString());
-        String githubSearchResults = null;
-        new GithubQueryTask().execute(githubSearchUrl);
+
+        Bundle queryBundle = new Bundle();
+        queryBundle.putString(SEARCH_QUERY_URL_EXTRA, githubSearchUrl.toString());
+
+        LoaderManager loaderManager = getSupportLoaderManager();
+        Loader<String> githubSearchLoader = loaderManager.getLoader(GITHUB_SEARCH_LOADER);
+
+        if (githubSearchLoader == null)
+        {
+            loaderManager.initLoader(GITHUB_SEARCH_LOADER, queryBundle, this);
+        }
+        else
+        {
+            loaderManager.restartLoader(GITHUB_SEARCH_LOADER, queryBundle, this);
+        }
     }
 
     private void showJsonDataView() {
